@@ -1,0 +1,5 @@
+/.idea/
+/workdir/
+/private/
+*.iml
+/bin/vendor/
