@@ -38,7 +38,7 @@ every showcase produces at least the following file
 ## using with docker
 
 1. install docker on your machine
-2. cd to the wokdir of your choice
+2. cd to the workdir of your choice
 
 ```
 docker run -it -v `pwd`:/workdir -v `pwd`/private:/private bwl21/ctcli auth
