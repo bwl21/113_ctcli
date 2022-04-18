@@ -15,7 +15,7 @@ require 'vendor/autoload.php';
 
 require_once __DIR__ . "/ct_apitools--helper.inc.php";
 
-$credentialstore = "$root/private/CT-credentialstore.phpx";
+$credentialstore = "$root/private/CT-credentialstore.php";
 
 if (!file_exists($credentialstore)) {
     echo "please copy the following lines to  '$credentialstore'\n\n";
@@ -29,14 +29,27 @@ if (!file_exists($credentialstore)) {
 /**
  * find the showcases to be processed
  */
+if (count($argv) == 1) {
+    $scripts = (array)glob(__DIR__ . "/../scripts/*.php");
+    $scripts = array_map('basename', $scripts);
+    $scripts = join("\n", $scripts);
+
+    echo <<<EOT
+Available Scripts:
+
+$scripts
+
+EOT;
+    exit(0);
+}
+
+
 if (count($argv) > 1) {
     $scripts = glob("scripts/*{$argv[1]}*.php");
-} else {
-    $scripts = [];
 }
 
 if (empty($scripts)) {
-    echo "no script found";
+    echo "no script found for '{$argv[1]}'";
     exit(-1);
 }
 
@@ -109,4 +122,3 @@ foreach ($scripts as $script) {
  */
 
 CT_logout($ajax_domain);
-echo("logged out\n");

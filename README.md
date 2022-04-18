@@ -41,17 +41,26 @@ every showcase produces at least the following file
 2. cd to the workdir of your choice
 
 ```
-docker run -it -v `pwd`:/workdir -v `pwd`/private:/private bwl21/ctcli auth
+docker run -it -v `pwd`:/ctcli/workdir -v `pwd`/private:/ctcli/private bwl21/ctcli auth
 ```
 
-# important showcawses
+Note that you need a credentials file in your `private` folder. If this file is missing, you get
+a template for the file in stdout.
+
+# available scripts
 
 ## churchauth.php
 
-this generates repoprts about access rights in your instance. It furtheron creates plantuml and a graphml
+this generates reports about access rights in your instance. It furtheron creates plantuml and a graphml
 files for your groups. Note that you need tools to visualize these files
 
 * [plantuml](https://plantuml.com),
 * [yed](https://yworks.com/products/yed)
+* [yed-live](https://www.yworks.com/yed-live/)
 
-## 
+### configuration
+
+You can configure this script in the credentials file, thereby add grouptypes which you might ignore.
+The grouptypes are numerical references to grouptype-ids in CT. Also see the grouptype definitons
+provided in the results `{ctinstance)_churchauth.grouptypedefs.json`
+

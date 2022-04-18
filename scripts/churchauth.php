@@ -63,6 +63,12 @@ class GroupHierarchy implements JsonSerializable
     private $lastid = 1000000;  // used for pseudoids
     private $grouptypedefs = []; // used for grouptype metadata
 
+    /**
+     * get the grouptype for pseudogroups
+     *
+     * @param $groupname
+     * @return int|mixed
+     */
     private function getgrouptypebyname($groupname)
     {
         if (array_key_exists($groupname, $this->grouptypedefs)) {
@@ -88,10 +94,11 @@ class GroupHierarchy implements JsonSerializable
     }
 
     /**
+     * Add a group to the hierarchy
+     *
      * @param $name // group name
      * @param array $parents // list of parent group names
      * @param array $extra : 'desc' => "...", 'type'=> 4, 'id' => 23, 'oldname' => "oldname"
-     *
      */
     function add($name, $parents = [], $extra = [])
     {
@@ -99,6 +106,9 @@ class GroupHierarchy implements JsonSerializable
 
         $id = array_key_exists("id", $extra) ? $extra["id"] : $this->lastid++;
         $desc = array_key_exists("desc", $extra) ? $extra["desc"] : "";
+
+        // if we add a pseudogroup, there is no grouptype in CT
+        // so we have to mock it.
         $type = array_key_exists("type", $extra) ?
             $extra["type"] : $this->getgrouptypebyname($name);  // todo proper handling of group types
 
@@ -149,6 +159,15 @@ class GroupHierarchy implements JsonSerializable
         $this->hierarchyvalid = true;
     }
 
+    /**
+     *
+     * load grouptype definitions p
+     * * provide adidtional access via prefix
+     * * provide index in the grouptypedef as well
+     *
+     * @param $grouptypedefs
+     * @return void
+     */
     function setgrouptypedefs($grouptypedefs)
     {
         $this->grouptypedefs = $grouptypedefs;
@@ -808,7 +827,6 @@ function create_jsonreport($authdefinitions, $filename)
  */
 function create_whocanwhatreport($response, $filename)
 {
-
     $sectionnames = [
         'auth_by_person' => '4 Person     ',
         'auth_by_status' => '1 Status     ',
@@ -872,7 +890,7 @@ function create_whocanwhatreport($response, $filename)
         $result[$grant] = $grantees;
     }
 
-    // save jason version
+    // save json version
     $outfile = fopen("$filename.json", "w");
     fwrite($outfile, json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     fclose($outfile);
@@ -892,7 +910,7 @@ function create_whocanwhatreport($response, $filename)
 }
 
 /**
- * inveerts whocanwhat such that we get whatcanwho
+ * inverts whocanwhat such that we get whatcanwho
  *
  * @param $whocanwhat
  * @return array
@@ -922,7 +940,6 @@ function invert_whocanwhat($whocanwhat)
  */
 function array_synergy($a, $b)
 {
-
     $common = array_intersect($a, $b);
     $amissing = array_values(array_diff($a, $common));
     $bmissing = array_values(array_diff($b, $common));
@@ -939,7 +956,6 @@ function array_synergy($a, $b)
             $resultba += 1;
         }
     }
-
 
     return [
         "a->b" => $resultab,
@@ -1020,6 +1036,12 @@ function find_roles_in_whatcanwho($whatcanwho)
     return ($result);
 }
 
+/**
+ * Generate a visualization of roles with similar permissions
+ *
+ * @param $similarities
+ * @return bool|string
+ */
 function create_graphml_for_roles($similarities)
 {
     $style = [
@@ -1067,7 +1089,7 @@ function create_graphml_for_roles($similarities)
     }
 
     //var_dump($doc);
-    // crate edghes
+    // create edges
     foreach ($similarities as $fromkey => $similarity) {
         foreach ($similarity['vergleich'] as $tokey => $compare) {
             $n_edge = $graph->addChild('edge');
@@ -1168,6 +1190,7 @@ function push_authcollection($resolved_auth, array &$authcollection, $grantee)
 
 // some exra metadata for grouptypes which are not available in churchtools
 // todo read type, prefix from CT ...
+// todo make this customizeable
 // be sure that we do not have more than 19 grouptypes
 $grouptypedefs = [
     # Gruppentypen
@@ -1181,7 +1204,7 @@ $grouptypedefs = [
     7 => ['color' => "#9177fc", 'type' => "Hilfsgruppe", 'prefix' => "ZZ", 'shape' => "rectangle"],
     8 => ['color' => "#bfbfbf", 'type' => "Berechtigung", 'prefix' => "RG", 'shape' => "fatarrow"],
 
-    # globale berechtiungsvergabe
+    # globale berechtigungsvergabe
 
     -20 => ['color' => "#bfbfff", 'type' => "Status", 'prefix' => "ST", 'shape' => "octagon"],
     -21 => ['color' => "#009900", 'type' => "Gruppentyp", 'prefix' => "GRTYP", 'shape' => "hexagon"],
@@ -1203,9 +1226,14 @@ $grouptypedefs = [
     -90 => ['color' => "#fffff", 'type' => "Legende", 'prefix' => "LG", 'shape' => "rectangle"],
 
     -1 => ['color' => "#ff0000", 'type' => "Pseudo", 'prefix' => "PSEUDO", 'shape' => "parallelogram"],
-
 ];
 
+
+$grouptypedefsfilename = basename($outfilebase) . ".grouptypedefs.json";
+$grouptypedefsfile = "private/$grouptypedefsfilename";
+if (file_exists($grouptypedefsfile)){
+    $grouptypedefs = json_decode(file_get_contents($grouptypedefsfile), JSON_OBJECT_AS_ARRAY);
+}
 
 // reading masterdata
 echo "reading masterdata\n";
@@ -1262,7 +1290,7 @@ $groups = $report2['response']['data'];
 
 
 // reading hierarchies
-echo "creading group hierarchy\n";
+echo "creating group hierarchy\n";
 $report3 = [
     'url' => "$ctdomain/api/groups/hierarchies",
     'method' => "GET",
@@ -1319,7 +1347,6 @@ foreach ($report4['response']['data']['roles'] as $role) {
     $grouphierarchy->add($name, ["GRTYP $grouptypename"]);
 }
 
-
 // add pseudogroups
 echo "adding pseudogroups\n";
 $grouphierarchy->add("GL Globale Rechte");
@@ -1329,10 +1356,12 @@ $grouphierarchy->add("ST Status", ["GL Globale Rechte"]);
 
 ///// create result files
 
-
 $filebase = $outfilebase;
 
 $grouphierarchy->buildhierarchy();
+
+echo "saving grouptypedefs\n";
+file_put_contents("$filebase.grouptypedefs.json", json_encode($grouptypedefs, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
 echo "create markdown report\n";
 create_markdownreport($authdefinitions,
