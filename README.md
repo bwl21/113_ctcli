@@ -2,7 +2,15 @@
 
 ## Prerequisites
 
-1. create a credential store
+1. create a user in ChurchTools with the necessary Permissions
+
+```
+* Berechtigungen anpassen [administer persons] (auth_table: 2) [2]
+* "Personen & Gruppen" sehen [view] (auth_table: 101) [101]
+* Alle Gruppen vom Gruppentyp sichtbar machen (außer versteckte!) [view grouptype] (auth_table: 105)
+```
+
+3. create a credential store
 
 ```bash
 cp assets/CT-credentialstore.php.template private/CT-credentialstore.php
