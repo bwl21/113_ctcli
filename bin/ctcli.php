@@ -18,8 +18,8 @@ require_once __DIR__ . "/ct_apitools--helper.inc.php";
 $credentialstore = "$root/private/CT-credentialstore.php";
 
 if (!file_exists($credentialstore)) {
-    echo "please copy the following lines to  '$credentialstore'\n\n";
-    echo(file_get_contents(__DIR__ . "/../assets/CT-credentialstore.php.template"));
+    file_put_contents($credentialstore, file_get_contents(__DIR__ . "/../assets/CT-credentialstore.php.template"));
+    echo "\n created $credentialstore\nplease edit this file according to your site";
     echo "\n\n";
     exit(-1);
 } else {
