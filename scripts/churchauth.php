@@ -755,34 +755,26 @@ function read_auth_by_groups(JsonObject $masterdata_jsonpath, array &$authdefini
  * create rubysimulation for the authdefinitions
  * also preserves group hierarchy
  */
-function create_rubysimulationfile(array $authdefinitions, $rubyfilename, &$grouphierarchy = [])
+function add_pseudogroups(array $authdefinitions,&$grouphierarchy = [])
 {
-    $rubyfile = fopen($rubyfilename, "w");
-
     $handledgroups = [];
 
     foreach ($authdefinitions as $authdefinition => $value) {
         $desc = $value['desc'];
         $groupname = $value['groupname'];
 
-        fwrite($rubyfile, "### auth definitions for $groupname\n");
         $rolesjson = json_encode($value['roles'], JSON_UNESCAPED_UNICODE);
         $record = "  plan.add('$authdefinition', [], $rolesjson, desc:%Q{{$desc}})\n";
         if (!array_key_exists($authdefinition, $handledgroups)) {
-            fwrite($rubyfile, $record);
             // preserve group hierarchy
             $grouphierarchy->add($authdefinition, $value['roles'], ['desc' => $desc]);
         }
         $handledgroups[$authdefinition] = $authdefinition;
 
         if (!empty($groupname)) { // write role definitions
-            {
-                fwrite($rubyfile, "### role definitions for $groupname\n");
-            }
             foreach ($value['roles'] as $role) {
                 $record = "  plan.add('$role', [], ['$groupname'], desc:%Q{{$desc}})\n";
                 if (!array_key_exists($role, $handledgroups)) {
-                    fwrite($rubyfile, $record);
                     //preserve group hierarchy
                     $grouphierarchy->add($role, [$groupname], ['desc' => $desc]);
                 }
@@ -790,7 +782,6 @@ function create_rubysimulationfile(array $authdefinitions, $rubyfilename, &$grou
             }
         }
     }
-    fclose($rubyfile);
     return null;
 }
 
