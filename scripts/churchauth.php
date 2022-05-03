@@ -1216,14 +1216,19 @@ $grouptypedefs = [
 
     -90 => ['color' => "#fffff", 'type' => "Legende", 'prefix' => "LG", 'shape' => "rectangle"],
 
-    -1 => ['color' => "#ff0000", 'type' => "Pseudo", 'prefix' => "PSEUDO", 'shape' => "parallelogram"],
+    -1 => ['color' => "#ff0000", 'type' => "Pseudo", 'prefix' => "PSEUDO", 'shape' => "octagon"],
 ];
 
 
 $grouptypedefsfilename = basename($outfilebase) . ".grouptypedefs.json";
-$grouptypedefsfile = "private/$grouptypedefsfilename";
+$grouptypedefsfile = "$root/private/$grouptypedefsfilename";
 if (file_exists($grouptypedefsfile)){
+    echo "loading $grouptypedefsfile";
     $grouptypedefs = json_decode(file_get_contents($grouptypedefsfile), JSON_OBJECT_AS_ARRAY);
+}
+else{
+    echo "creating grouptypedefs to $grouptypedefsfile\n";
+    file_put_contents($grouptypedefsfile, json_encode($grouptypedefs, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
 
 // reading masterdata
@@ -1349,10 +1354,12 @@ $grouphierarchy->add("ST Status", ["GL Globale Rechte"]);
 
 $filebase = $outfilebase;
 
-$grouphierarchy->buildhierarchy();
+echo "adding pseudogroups\n";
+// this adds the nodes for pseudogroups
+add_pseudogroups($authdefinitions + $pseudogroups,
+    $grouphierarchy);
 
-echo "saving grouptypedefs\n";
-file_put_contents("$filebase.grouptypedefs.json", json_encode($grouptypedefs, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+$grouphierarchy->buildhierarchy();
 
 echo "create markdown report\n";
 create_markdownreport($authdefinitions,
