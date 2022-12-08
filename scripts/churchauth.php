@@ -53,6 +53,7 @@ class GroupHierarchy implements JsonSerializable
 {
     public $ctbaseurl = "";
     public $groupidstoignore = [];   // groupids to be ignored
+    public $grouptypes = []; // to be read from Churfchtools
 
     private $groups = [];    // details of groups index = group id
     private $hierarchy = [];  // hierarchy index = group id
@@ -69,8 +70,7 @@ class GroupHierarchy implements JsonSerializable
      * @param $groupname
      * @return int|mixed
      */
-    private function getgrouptypebyname($groupname)
-    {
+    private function getgrouptypebyname($groupname) {
         if (array_key_exists($groupname, $this->grouptypedefs)) {
             return ($this->grouptypedefs[$groupname]);
         }
@@ -88,8 +88,7 @@ class GroupHierarchy implements JsonSerializable
      *
      * extract the prefix from a name
      */
-    function getprefix($name)
-    {
+    function getprefix($name) {
         return explode(" ", $name)[0];
     }
 
@@ -100,8 +99,7 @@ class GroupHierarchy implements JsonSerializable
      * @param array $parents // list of parent group names
      * @param array $extra : 'desc' => "...", 'type'=> 4, 'id' => 23, 'oldname' => "oldname"
      */
-    function add($name, $parents = [], $extra = [])
-    {
+    function add($name, $parents = [], $extra = []) {
         $this->hierarchyvalid = false;  // invalidate hierarchy
 
         $id = array_key_exists("id", $extra) ? $extra["id"] : $this->lastid++;
@@ -131,8 +129,7 @@ class GroupHierarchy implements JsonSerializable
     /**
      * rebuild the hierarchy of groups to prepare for output
      */
-    function buildhierarchy()
-    {
+    function buildhierarchy() {
         $this->hierarchy = [];  // hierarchy index = group id
         // populat hierarchy with parent ids
         foreach ($this->groups as $group) {
@@ -168,8 +165,7 @@ class GroupHierarchy implements JsonSerializable
      * @param $grouptypedefs
      * @return void
      */
-    function setgrouptypedefs($grouptypedefs)
-    {
+    function setgrouptypedefs($grouptypedefs) {
         $this->grouptypedefs = $grouptypedefs;
         $keys = array_keys($grouptypedefs);
         foreach ($keys as $key) {
@@ -184,8 +180,7 @@ class GroupHierarchy implements JsonSerializable
      *
      * export hierarchy as plantuml
      */
-    function toplantuml()
-    {
+    function toplantuml() {
         $result = ['@startuml'];
         // write groups
         // write edges
@@ -228,8 +223,7 @@ class GroupHierarchy implements JsonSerializable
     /**
      * export hierarhy as graphml
      */
-    function tographml($pattern = "/.*/")
-    {
+    function tographml($pattern = "/.*/") {
 
         // the template
         $template = GRAPHMLTEPLATE;
@@ -250,8 +244,7 @@ class GroupHierarchy implements JsonSerializable
      * implement for JsonSerializeable
      *
      */
-    function jsonSerialize()
-    {
+    function jsonSerialize() {
         $this->buildhierarchy();
         return get_object_vars($this);
     }
@@ -259,8 +252,7 @@ class GroupHierarchy implements JsonSerializable
     /**
      * @param $graph
      */
-    private function tographml_groups($graph): void
-    {
+    private function tographml_groups($graph): void {
         foreach ($this->groups as $group) {
 
             if (!array_key_exists('type', $group)) {
@@ -273,23 +265,21 @@ class GroupHierarchy implements JsonSerializable
                 continue;
             }
 
-            // find grouptype def by id
-            $grouptype = array_key_exists($group['type'], $this->grouptypedefs)
-                ? $this->grouptypedefs[$group['type']] : null;
-
-
-            // find grouptype def by prefix
-            $prefix = $this->getprefix($group['name']);
-            if (!isset($grouptype)) {
-                $grouptype = array_key_exists($prefix,
-                    $this->grouptypedefs) ? $this->grouptypedefs[$prefix] : null;
+            if (isset($grouptypeid) && $grouptypeid > 0) {
+                $grouptype = $this->grouptypes[$grouptypeid];
+                $prefix = getgrouptypeabbreviation($grouptype);
+            } else {
+                $grouptype = null;
+                $prefix = $this->getprefix($group['name']);
             }
+
+            $grouptypedef = array_key_exists($prefix,
+                $this->grouptypedefs) ? $this->grouptypedefs[$prefix] : null;
 
             // otherwise take the first defined type
-            if (!isset($grouptype)) {
-                $grouptype = $this->grouptypedefs[0];
+            if (!isset($grouptypedef)) {
+                $grouptypedef = $this->grouptypedefs[0];
             }
-
 
             // add the node
             $n_node = $graph->addChild("node");
@@ -323,19 +313,18 @@ class GroupHierarchy implements JsonSerializable
 
             // add shapetype
             $n_shape = $n_shapenode->addChild('Shape', null, "http://www.yworks.com/xml/graphml");
-            $n_shape['type'] = $grouptype['shape'];
+            $n_shape['type'] = $grouptypedef['shape'];
 
             // ad shape fill color
             $n_fill = $n_shapenode->addChild("Fill", null, "http://www.yworks.com/xml/graphml");
-            $n_fill['color'] = $grouptype['color'];
+            $n_fill['color'] = $grouptypedef['color'];
         }
     }
 
     /**
      * @param $graph
      */
-    private function tographml_edges($graph): void
-    {
+    private function tographml_edges($graph): void {
         foreach ($this->hierarchy as $meid => $parentids) {
 
             $megrouptype = $this->groups[$meid]['type'];
@@ -370,8 +359,7 @@ class GroupHierarchy implements JsonSerializable
      * @param $grouptypeid
      * @return bool
      */
-    private function ignorebyGrouptype($grouptypeid): bool
-    {
+    private function ignorebyGrouptype($grouptypeid): bool {
         foreach ($this->groupidstoignore as $interval) {
             if (($grouptypeid >= $interval[0]) && ($grouptypeid <= $interval[1])) {
                 return true;
@@ -390,9 +378,18 @@ class GroupHierarchy implements JsonSerializable
  * construct the abbreviation for a grouptype
  * used to build the name of the pseudogrup
  */
-function getgrouptypeabbreviation($grouptypename)
-{
-    return explode(" ", $grouptypename)[0];
+function getgrouptypeabbreviation($grouptype) {
+    if (array_key_exists('kuerzel', $grouptype)) {
+        return $grouptype['kuerzel'];
+    }
+    if (array_key_exists('shorty', $grouptype)) {
+        return $grouptype['shorty'];
+    }
+    if (array_key_exists('prefix', $grouptype)) {
+        return $grouptype['prefix'];
+    }
+
+    return explode(" ", $grouptype['bezeichnung'])[0];
 }
 
 
@@ -406,8 +403,7 @@ function getgrouptypeabbreviation($grouptypename)
  * @return array|array[]|null
  * @throws InvalidJsonPathException InvalidJsonException
  */
-function resolve_auth_entry($auth_entry, &$masterdata_jsonpath, $datafield = null, $permission_deep_no = null)
-{
+function resolve_auth_entry($auth_entry, &$masterdata_jsonpath, $datafield = null, $permission_deep_no = null) {
     if (!isset($auth_entry)) {
         return null;
     }
@@ -489,8 +485,7 @@ function resolve_auth_entry($auth_entry, &$masterdata_jsonpath, $datafield = nul
  * @param $definition array the auth definition
  * @param $authdefinitions array here we collect the auth definitions and usages
  */
-function pushauthdef($hash, $role, $groupname, $definition, &$authdefinitions)
-{
+function pushauthdef($hash, $role, $groupname, $definition, &$authdefinitions) {
     $desc = reportauthasmd($definition, "");
     if (key_exists($hash, $authdefinitions)) {
         $authdefinitions[$hash]['roles'][] = $role;
@@ -508,8 +503,7 @@ function pushauthdef($hash, $role, $groupname, $definition, &$authdefinitions)
  * @param $indent string
  * @return string
  */
-function reportauthasmd($definition, $indent = "")
-{
+function reportauthasmd($definition, $indent = "") {
     if (!isset($definition)) {
         return "";
     }
@@ -540,8 +534,7 @@ function reportauthasmd($definition, $indent = "")
  * @return array
  * @throws InvalidJsonPathException
  */
-function read_auth_by_status($masterdata_jsonpath, array &$authdefinitions, array &$pseudogroups): array
-{
+function read_auth_by_status($masterdata_jsonpath, array &$authdefinitions, array &$pseudogroups): array {
     $statuus = find_in_JSONPath($masterdata_jsonpath, '$..churchauth.status.*');
     if (empty($statuus)) {
         $statuus = [];
@@ -584,8 +577,11 @@ function read_auth_by_status($masterdata_jsonpath, array &$authdefinitions, arra
  * @throws InvalidJsonPathException
  */
 
-function read_auth_by_grouptypes(JsonObject $masterdata_jsonpath, array &$authdefinitions, array &$pseudogroups): array
-{
+function read_auth_by_grouptypes(
+    JsonObject $masterdata_jsonpath,
+    array &$authdefinitions,
+    array &$pseudogroups
+): array {
     $grouptypes = find_in_JSONPath($masterdata_jsonpath, '$.data.churchauth.cdb_gruppentyp.*');
     if (empty($grouptypes)) {
         $grouptypes = [];
@@ -603,19 +599,19 @@ function read_auth_by_grouptypes(JsonObject $masterdata_jsonpath, array &$authde
         $membertypes = find_in_JSONPath($masterdata_jsonpath,
             "$..grouptypeMemberstatus[?(@.gruppentyp_id == '$grouptypeid')]");
         $r = array_map(function ($authentry) use (
+            $grouptype,
             $grouptypename,
             $masterdata_jsonpath,
             $permission_deep_no,
             &$authdefinitions
         ) {
-
-            // there might be grouptypes without auth enty
+            // there might be grouptypes without auth entry
             $auth = (array_key_exists('auth', $authentry)) ? $authentry['auth'] : [];
             $resolved_auth = resolve_auth_entry($auth, $masterdata_jsonpath, null, $permission_deep_no);
 
             $hash = hash('md5', json_encode($resolved_auth));
 
-            $gtabbreviation = getgrouptypeabbreviation($grouptypename);
+            $gtabbreviation = getgrouptypeabbreviation($grouptype);
             pushauthdef($hash, "GTRL $gtabbreviation {$authentry['bezeichnung']}", null, $resolved_auth,
                 $authdefinitions);
 
@@ -639,8 +635,7 @@ function read_auth_by_grouptypes(JsonObject $masterdata_jsonpath, array &$authde
  * @param $masterdata_jsonpath
  * @param $authdefinitions
  */
-function read_auth_by_person($masterdata_jsonpath, array &$authdefinitions, array &$pseudogroups)
-{
+function read_auth_by_person($masterdata_jsonpath, array &$authdefinitions, array &$pseudogroups) {
     $personmissing = [];
     $personauth = [];
 
@@ -685,8 +680,7 @@ function read_auth_by_person($masterdata_jsonpath, array &$authdefinitions, arra
  * @return array
  * @throws InvalidJsonPathException
  */
-function read_auth_by_groups(JsonObject $masterdata_jsonpath, array &$authdefinitions, array &$pseudogroups): array
-{
+function read_auth_by_groups(JsonObject $masterdata_jsonpath, array &$authdefinitions, array &$pseudogroups): array {
     //$groups = find_in_JSONPath($masterdata_jsonpath,'$..groups.*');
 
     $groupmemberauth = find_in_JSONPath($masterdata_jsonpath, '$.data.churchauth.groupMemberstatus[?(@.auth)]');
@@ -755,8 +749,7 @@ function read_auth_by_groups(JsonObject $masterdata_jsonpath, array &$authdefini
  * create rubysimulation for the authdefinitions
  * also preserves group hierarchy
  */
-function add_pseudogroups(array $authdefinitions,&$grouphierarchy = [])
-{
+function add_pseudogroups(array $authdefinitions, &$grouphierarchy = []) {
     $handledgroups = [];
 
     foreach ($authdefinitions as $authdefinition => $value) {
@@ -789,8 +782,7 @@ function add_pseudogroups(array $authdefinitions,&$grouphierarchy = [])
  * @param $authdefinitions
  * @param $filename
  */
-function create_markdownreport($authdefinitions, $filename)
-{
+function create_markdownreport($authdefinitions, $filename) {
     $rubyfile = fopen($filename, "w");
     foreach ($authdefinitions as $authdefinition => $value) {
         fwrite($rubyfile, "\n\n# $authdefinition");
@@ -805,8 +797,7 @@ function create_markdownreport($authdefinitions, $filename)
  * @param $authdefinitions
  * @param $filename
  */
-function create_jsonreport($authdefinitions, $filename)
-{
+function create_jsonreport($authdefinitions, $filename) {
     $jsonfile = fopen($filename, "w");
     fwrite($jsonfile, json_encode($authdefinitions, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     fclose($jsonfile);
@@ -816,8 +807,7 @@ function create_jsonreport($authdefinitions, $filename)
  * @param $response
  * @param $filename
  */
-function create_whocanwhatreport($response, $filename)
-{
+function create_whocanwhatreport($response, $filename) {
     $sectionnames = [
         'auth_by_person' => '4 Person     ',
         'auth_by_status' => '1 Status     ',
@@ -906,8 +896,7 @@ function create_whocanwhatreport($response, $filename)
  * @param $whocanwhat
  * @return array
  */
-function invert_whocanwhat($whocanwhat)
-{
+function invert_whocanwhat($whocanwhat) {
     $result = [];
 
     foreach ($whocanwhat as $grant => $grantees) {
@@ -929,8 +918,7 @@ function invert_whocanwhat($whocanwhat)
  * @param $b
  * @return array
  */
-function array_synergy($a, $b)
-{
+function array_synergy($a, $b) {
     $common = array_intersect($a, $b);
     $amissing = array_values(array_diff($a, $common));
     $bmissing = array_values(array_diff($b, $common));
@@ -965,8 +953,7 @@ function array_synergy($a, $b)
  * @param $whatcanwho
  * @return array
  */
-function find_roles_in_whatcanwho($whatcanwho)
-{
+function find_roles_in_whatcanwho($whatcanwho) {
     $result = [];
 
     $whatcanwhokeys = array_keys($whatcanwho);
@@ -1033,8 +1020,7 @@ function find_roles_in_whatcanwho($whatcanwho)
  * @param $similarities
  * @return bool|string
  */
-function create_graphml_for_roles($similarities)
-{
+function create_graphml_for_roles($similarities) {
     $style = [
         "ZGF" => [
             'color' => "green"
@@ -1125,8 +1111,7 @@ function create_graphml_for_roles($similarities)
  * @param $key
  * @return string
  */
-function encodexmlentities($key): string
-{
+function encodexmlentities($key): string {
     return str_replace("&", "&amp;", $key);
 }
 
@@ -1134,8 +1119,7 @@ function encodexmlentities($key): string
  * @param $input
  * @return string
  */
-function escapedquotes($input): string
-{
+function escapedquotes($input): string {
     return str_replace("\"", "'", $input);
 }
 
@@ -1150,8 +1134,7 @@ function escapedquotes($input): string
  * @param $grantee string the name of the grante (status, grouptype+role ...)
  * @return array|null
  */
-function push_authcollection($resolved_auth, array &$authcollection, $grantee)
-{
+function push_authcollection($resolved_auth, array &$authcollection, $grantee) {
     foreach ($resolved_auth as $authentry) {
         $grant = array_keys($authentry)[0];
         // if there are subelements for which we have a grant
@@ -1184,7 +1167,7 @@ function push_authcollection($resolved_auth, array &$authcollection, $grantee)
 // todo make this customizeable
 // be sure that we do not have more than 19 grouptypes
 $grouptypedefs = [
-    # Gruppentypen
+    // can be removed shall be read from CT.
     0 => ['color' => "#ff0000", 'type' => "Fehler", 'prefix' => "ER", 'shape' => "parallelogram"],
     1 => ['color' => "#ffe4c4", 'type' => "Kleingruppe", 'prefix' => "KG", 'shape' => "rectangle"],
     2 => ['color' => "#ff9933", 'type' => "Eventgruppe", 'prefix' => "EG", 'shape' => "rectangle"],
@@ -1222,11 +1205,13 @@ $grouptypedefs = [
 
 $grouptypedefsfilename = basename($outfilebase) . ".grouptypedefs.json";
 $grouptypedefsfile = "$root/private/$grouptypedefsfilename";
-if (file_exists($grouptypedefsfile)){
+if (file_exists($grouptypedefsfile)) {
     echo "loading $grouptypedefsfile";
     $grouptypedefs = json_decode(file_get_contents($grouptypedefsfile), JSON_OBJECT_AS_ARRAY);
-}
-else{
+    if (is_null($grouptypedefs)) {
+        die ("Fehler in $grouptypedefsfile");
+    }
+} else {
     echo "creating grouptypedefs to $grouptypedefsfile\n";
     file_put_contents($grouptypedefsfile, json_encode($grouptypedefs, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
@@ -1270,7 +1255,7 @@ $grouphierarchy->ctbaseurl = $ctdomain;
 
 $grouphierarchy->setgrouptypedefs($grouptypedefs);
 
-$grouphierarchy->add("MISSING Parent", [], ['type' => 0]);
+$grouphierarchy->add("MISSING Parent", [], ['type' => -1]);
 
 // reading groups
 echo "creating groups\n";
@@ -1335,10 +1320,12 @@ foreach ($report4['response']['data']['groupTypes'] as $grouptype) {
     $grouphierarchy->add("GRTYP $grouptypename", ["GRTYP Gruppentyp"]);
 }
 
+$grouphierarchy->grouptypes = $grouptypes;
 
 foreach ($report4['response']['data']['roles'] as $role) {
-    $grouptypename = $grouptypes[$role['groupTypeId']]['name'];
-    $gtabbreviation = getgrouptypeabbreviation($grouptypename);
+    $grouptype = $grouptypes[$role['groupTypeId']];
+    $grouptypename = $grouptype['name'];
+    $gtabbreviation = getgrouptypeabbreviation($grouptype);
     $name = "GTRL {$gtabbreviation} {$role['name']}";
     $grouphierarchy->add($name, ["GRTYP $grouptypename"]);
 }
