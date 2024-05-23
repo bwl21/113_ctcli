@@ -27,7 +27,7 @@ if (!file_exists($credentialstore)) {
 }
 
 /**
- * find the showcases to be processed
+ * find the scripts to be processed
  */
 if (count($argv) == 1) {
     $scripts = (array)glob(__DIR__ . "/../scripts/*.php");
@@ -45,12 +45,15 @@ EOT;
 
 
 if (count($argv) > 1) {
-    $scripts = glob("scripts/*{$argv[1]}*.php");
-}
-
-if (empty($scripts)) {
-    echo "no script found for '{$argv[1]}'";
-    exit(-1);
+    $scripts = glob(__DIR__ . "/src/*{$argv[1]}*.php");
+    if (count($scripts) == 0) {
+        die("no scripts found for {$argv[1]}\n");
+    }
+    if (count($scripts) > 1) {
+        die("more than one script found for {$argv[1]}\n");
+    }
+} else {
+    die ("no argument given\n");
 }
 
 if (count($scripts) > 1) {
@@ -79,12 +82,15 @@ $result = CT_loginAuth($ctdomain, $email, $password);
 
 if (!$result['status'] == 'success') {
     var_dump($result);
-    die("Showcase aborted / login failed");
+    die("script aborted / login failed");
 }
 
+
 /**
- * execute showcases
+ * execute scripts
  */
+
+//var_dump($argv);
 
 foreach ($scripts as $script) {
 
@@ -95,30 +101,24 @@ foreach ($scripts as $script) {
     $report = [];
     echo "doing $script\n";
 
-    $showcasebase = basename($script, ".php");
-    $outfolder = array_key_exists('outfolder', CREDENTIALS) ? CREDENTIALS['outfolder'] : ".";
-    $outfolder = "$root/workdir/$outfolder";
+    $scriptbase = basename($script, ".php");
+    $outfolder = array_key_exists('outfolder', CREDENTIALS) ? CREDENTIALS['outfolder'] : __DIR__ . "/responses";
+    $filebase = "$outfolder/{$ctinstance}_";
 
-    if (!is_dir($outfolder)) {
-        echo("\ncreating $outfolder");
-        mkdir($outfolder, 0777, true);
-    }
-
-    // clear outfolder
-
-    array_map('unlink', array_filter((array)glob("$outfolder/*")));
-
-    // note there is no separator between ctinstance and showcasebase
-    // to support filename built of showcasebase only (without mentioning the ctinstance)
-    $outfilebase = "$outfolder/{$ctinstance}$showcasebase";
+    // note there is no separato btween ctinstance and scriptbase
+    // to support filenam built of scriptbase onley
+    $outfilebase = "$filebase$scriptbase";
     require_once($script);
-    echo($outfilebase);
+
     $myfile = fopen("$outfilebase.json", "w") or die("Unable to open file!");
     fwrite($myfile, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     fclose($myfile);
+    echo ("\nwrote `$outfilebase.json`\n");
 }
 /**
  * logout
  */
 
+
 CT_logout($ajax_domain);
+echo("logged out\n");
